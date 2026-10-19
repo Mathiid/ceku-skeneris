@@ -1,5 +1,5 @@
 /* Apvalka izkārtojums. Visi stili ir šeit (CSP aizliedz inline stilus). */
-:root { --fons: #0f1011; --teksts: #f4f5f3; --klusa: #9a9fa3; --zals: #3a6b53; --zalsgaisais: #8fcfae; --kluda: #ff9a90; --lin: #2b2c2e; color-scheme: dark; }
+:root { --fons: #0f172a; --teksts: #f4f5f3; --klusa: #9a9fa3; --zals: #3a6b53; --zalsgaisais: #8fcfae; --kluda: #ff9a90; --lin: #2b2c2e; color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--fons); color: var(--teksts); overscroll-behavior: none; }
 body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.45; -webkit-font-smoothing: antialiased; }
