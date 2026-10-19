@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<!--
+  ČEKU SKENERIS — PWA apvalks (ievieto GitHub Pages vai jebkurā statiskā hostingā ar HTTPS)
+
+  Kāpēc tas ir vajadzīgs: Apps Script nevar atdot statisku manifestu un service worker, tāpēc pati Web App nevar kļūt par
+  īstu instalējamu PWA. Šī lapa to dara viņas vietā: tai ir īsts manifests, service worker un ikonas, un tā pilnekrānā
+  ielādē Apps Script lietotni iframe iekšā. Iestatījumi: config.js. Pilna instrukcija: README.md.
+-->
+<meta charset="utf-8">
+<title>Čeku skeneris</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; manifest-src 'self'; frame-src https://script.google.com https://*.googleusercontent.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1011">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Čeku Skeneris">
+<meta name="application-name" content="Čeku skeneris">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+  <!-- Lietotne (Apps Script Web App iframe iekšā) -->
+  <main id="lietotne" hidden>
+    <iframe id="kadrs" title="Čeku skeneris" allow="camera; clipboard-write; fullscreen" referrerpolicy="no-referrer"></iframe>
+  </main>
+
+  <!-- Ielāde -->
+  <section class="ekrans" id="ielade">
+    <div class="griez" aria-hidden="true"></div>
+    <p id="ieladeTeksts">Ielādē lietotni…</p>
+    <button type="button" class="poga" id="btnPaligs" hidden>Mēģināt vēlreiz</button>
+    <button type="button" class="saite" id="btnMainit" hidden>Mainīt lietotnes adresi</button>
+  </section>
+
+  <!-- Pirmā palaišana: Apps Script adrese nav norādīta config.js -->
+  <section class="ekrans" id="uzstadit" hidden>
+    <img src="icons/icon-192.png" alt="" width="72" height="72">
+    <h1>Čeku skeneris</h1>
+    <p>Ielīmē savas Apps Script lietotnes adresi (tā beidzas ar <strong>/exec</strong>). To var arī ierakstīt failā <strong>config.js</strong>, un tad šis solis pazūd.</p>
+    <form id="formUzst" novalidate>
+      <label for="adrese">Web App adrese</label>
+      <input type="url" id="adrese" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+      <p class="kl" id="uzstKluda" hidden></p>
+      <button type="submit" class="poga">Saglabāt un atvērt</button>
+    </form>
+  </section>
+
+  <!-- Nav interneta -->
+  <section class="ekrans" id="bezsaistes" hidden>
+    <img src="icons/icon-192.png" alt="" width="72" height="72">
+    <h1>Nav interneta</h1>
+    <p>Čeku skeneris strādā tikai ar savienojumu. Kad internets atgriezīsies, lietotne atvērsies pati.</p>
+    <button type="button" class="poga" id="btnMegina">Mēģināt vēlreiz</button>
+  </section>
+
+  <noscript><p class="noscript">Šai lapai vajadzīgs JavaScript.</p></noscript>
+  <script src="config.js"></script>
+  <script src="shell.js"></script>
+</body>
+</html>

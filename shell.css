@@ -1,0 +1,29 @@
+/* Apvalka izkārtojums. Visi stili ir šeit (CSP aizliedz inline stilus). */
+:root { --fons: #0f1011; --teksts: #f4f5f3; --klusa: #9a9fa3; --zals: #3a6b53; --zalsgaisais: #8fcfae; --kluda: #ff9a90; --lin: #2b2c2e; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--fons); color: var(--teksts); overscroll-behavior: none; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+
+/* Lietotnes iframe aizpilda visu ekrānu, izņemot drošās zonas (iOS status josla augšā, sākuma indikators apakšā).
+   --crop (config.js → cropTop) pabīda iframe uz augšu, lai paslēptu Google brīdinājuma joslu, ja tāda parādās. */
+#lietotne { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top); bottom: env(safe-area-inset-bottom); overflow: hidden; background: var(--fons); }
+#kadrs { position: absolute; left: 0; width: 100%; top: calc(-1 * var(--crop, 0px)); height: calc(100% + var(--crop, 0px)); border: 0; background: var(--fons); }
+
+.saite { padding: 8px; border: 0; background: none; color: var(--klusa); font: inherit; font-size: .92rem; text-decoration: underline; cursor: pointer; }
+/* Visi palīgekrāni (ielāde, adrese, bezsaiste) ir pārklājumi virs lietotnes iframe */
+.ekrans { position: fixed; inset: 0; z-index: 5; overflow: auto; background: var(--fons); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+.ekrans h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 1.9rem; }
+.ekrans p { margin: 0; max-width: 34ch; color: var(--klusa); }
+.ekrans img { border-radius: 18px; }
+.ekrans form { width: min(380px, 100%); display: grid; gap: 12px; text-align: left; }
+label { font-weight: 600; }
+input { width: 100%; min-width: 0; min-height: 52px; padding: 14px 16px; font: inherit; color: var(--teksts); background: #101112; border: 1.5px solid var(--lin); border-radius: 14px; }
+input:focus { outline: none; border-color: var(--zalsgaisais); }
+.poga { padding: 15px 26px; border: 0; border-radius: 999px; background: #fff; color: #111; font: inherit; font-weight: 600; cursor: pointer; }
+.ekrans form .poga { width: 100%; }
+.kl { margin: 0; color: var(--kluda); font-size: .92rem; max-width: none; }
+.griez { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--lin); border-top-color: var(--zalsgaisais); animation: grie .8s linear infinite; }
+@keyframes grie { to { transform: rotate(360deg); } }
+.noscript { padding: 24px; }
+@media (prefers-reduced-motion: reduce) { .griez { animation-duration: 3s; } }
