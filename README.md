@@ -41,7 +41,7 @@ Visur ir **viena** krāsa, `#0f172a`: `manifest.webmanifest` (`background_color`
 ## Problēmu risināšana
 
 - **Baltā/tukšā lapa vai Google kļūdas josla augšā:** Google dažkārt rāda brīdinājuma joslu "This application was created by another user…". Ieraksti `config.js` → `cropTop: 40` (pārbaudi, lai augšējā lietotnes josla nepazūd; vajadzības gadījumā samazini).
-- **Pēc kodu/failu maiņas vecā versija:** `sw.js` palielini `VERSION` (piem., `'v3'`; šobrīd `'v2'`) un augšupielādē vēlreiz.
+- **Pēc kodu/failu maiņas vecā versija:** `sw.js` palielini `VERSION` (piem., `'v4'`; šobrīd `'v3'`) un augšupielādē vēlreiz.
 - **Sesija "neturas" iOS:** pārbaudi, vai `PWA_ORIGIN` ir pareizs (precīzs domēns, `https`), un ka lietotne tiek atvērta caur apvalka adresi.
 - **Bridge nestrādā, ja Google maina savu iekšējo domēnu:** apvalks pieņem ziņas tikai no `script.google.com` un `*-script.googleusercontent.com`. Ja Google to izmaina, lietotne turpina strādāt, tikai sesija glabājas bez apvalka palīdzības.
 
@@ -49,4 +49,5 @@ Visur ir **viena** krāsa, `#0f172a`: `manifest.webmanifest` (`background_color`
 
 - Apvalks pieņem ziņas tikai no Apps Script lapām, atbild tikai tai pašai adresei un glabā tikai divas atslēgas (`sesija`, `epasts`), ne vairāk par 2000 simboliem.
 - Pats kods (parole) netiek glabāts nekur, tikai sesijas marķieris.
-- Apvalka CSP ļauj iegult tikai `script.google.com` un `*.googleusercontent.com`. GitHub Pages neļauj iestatīt `frame-ancestors`, tāpēc kāds cits varētu iegult tavu apvalku savā lapā, taču sesiju viņš nesaņems (ziņas no cita origin tiek ignorētas).
+- **API atslēga (`SECRET_API_KEY`):** `shell.js` augšpusē ir konstante `SECRET_API_KEY`, un tai jābūt TĀDAI PAŠAI kā `SECRET_API_KEY` failā `Code.gs`. To izmanto tikai JSON ieeja (`doPost`): ja atslēga nesakrīt, serveris atbild `Piekļuve liegta` un neko nedara. Pati lietotne šo ieeju neizmanto (tā strādā caur `google.script.run`), un `shell.js` palīgs `CEKU_API.post('ping')` netiek izsaukts automātiski. Atslēga ir publiskā failā, tāpēc tā NAV patiess noslēpums, bet atsijā gadījuma pieprasījumus. Kad maini atslēgu, nomaini to abos failos un palielini `VERSION` failā `sw.js`.
+- Apvalka CSP ļauj iegult tikai `script.google.com` un `*.googleusercontent.com`, un tikai uz šīm adresēm atļauj JSON pieprasījumus (`connect-src`). GitHub Pages neļauj iestatīt `frame-ancestors`, tāpēc kāds cits varētu iegult tavu apvalku savā lapā, taču sesiju viņš nesaņems (ziņas no cita origin tiek ignorētas).

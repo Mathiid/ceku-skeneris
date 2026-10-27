@@ -4,7 +4,7 @@
  * Stratēģija: tīkls vispirms, kešs kā rezerve (tāpēc izmaiņas failos parādās uzreiz, kad ir internets).
  * Kad maini apvalka failus, palielini VERSION, lai vecais kešs tiktu izmests.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const KESS = 'ceku-apvalks-' + VERSION;
 const FAILI = ['./', 'index.html', 'shell.css', 'shell.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];

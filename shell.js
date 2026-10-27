@@ -11,6 +11,13 @@
  * DROŠĪBA: ziņas tiek pieņemtas TIKAI no Apps Script lapām (script.google.com un *-script.googleusercontent.com),
  * atbildes tiek sūtītas TIKAI uz to pašu adresi, kas ziņu atsūtīja, un glabāt var tikai divas fiksētas atslēgas.
  */
+/*
+ * API drošības atslēga JSON ieejai (Apps Script doPost). Tai jābūt TĀDAI PAŠAI kā SECRET_API_KEY failā Code.gs.
+ * SVARĪGI: šis fails tiek publicēts (GitHub Pages), tāpēc ikviens var to nolasīt. Atslēga atsijā gadījuma un automatizētus
+ * pieprasījumus, bet NAV patiess noslēpums; īstā aizsardzība ir pieteikšanās (e-pasts + kods) un sesijas marķieris serverī.
+ */
+const SECRET_API_KEY = 'Hdj4JWTxY0EgZMFtgirbAnsyPmlfmE8CVyL6XzEG';
+
 (function () {
   'use strict';
 
@@ -192,6 +199,30 @@
       instalet();
     }
   });
+
+  // ── JSON ieeja (doPost) ──
+  // Pati lietotne ar serveri runā caur google.script.run, tāpēc šī funkcija netiek izsaukta automātiski. Tā ir paredzēta citiem skriptiem:
+  //   CEKU_API.post('ping').then(console.log);
+  //   CEKU_API.post('getData', [sesija]).then(function (dati) { … });
+  // Pieprasījums ir teksts (text/plain), lai pārlūks nesūtītu pirmspārbaudi (Apps Script uz to neatbild). Apiet atslēgu ar apiKey nevar:
+  // serveris to pārbauda pirmo un nesakrišanas gadījumā atbild "Piekļuve liegta".
+  function apiPost(darbiba, args) {
+    var url = lietotnesAdrese();
+    if (!url) return Promise.reject(new Error('Nav norādīta Apps Script adrese.'));
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ apiKey: SECRET_API_KEY, action: String(darbiba), args: Array.isArray(args) ? args : [] }),
+      credentials: 'omit',
+      redirect: 'follow'
+    }).then(function (r) {
+      return r.json().catch(function () { throw new Error('Servera atbilde nav derīga.'); });
+    }).then(function (d) {
+      if (!d || d.ok !== true) throw new Error((d && typeof d.kluda === 'string' && d.kluda) || 'Piekļuve liegta');
+      return d.res;
+    });
+  }
+  window.CEKU_API = Object.freeze({ post: apiPost });
 
   // ── Starts ──
   var crop = Number(CFG.cropTop);
