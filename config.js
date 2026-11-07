@@ -8,7 +8,7 @@
  *  extraFrameOrigins Papildu adreses, no kurām apvalks pieņem ziņas (tikai izstrādei/testiem; parasti tukšs masīvs).
  */
 window.CEKU_CONFIG = {
-  appsScriptUrl: '',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbw3unaAKgFbGFHXy3ABGbftr7N4lGiXiHpEF5IPcXjE2sVDPjCTEDKDLSWzBRPA3WzYhA/exec',
   cropTop: 0,
   extraFrameOrigins: []
 };
