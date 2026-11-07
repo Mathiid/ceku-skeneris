@@ -6,7 +6,11 @@
  *   2. Reģistrē service worker (sw.js), lai apvalks būtu instalējams un atvērtos ātri.
  *   3. Uztur "tiltu" ar lietotni (window.postMessage). Lietotne ir iegulta iframe iekšā, kur Safari mēdz regulāri
  *      iztīrīt glabātuvi, tāpēc sesiju papildus glabā šis apvalks savā pirmās puses localStorage.
- *      Tilts atbild uz: get / set / del (tikai atslēgas "sesija" un "epasts"), hello (statuss) un install (Android "Install").
+ *      Tilts atbild uz: get / set / del (tikai atslēgas "sesija" un "epasts"), hello (statuss), install (Android "Install") un
+ *      darbs (lietotne pasaka, vai notiek nolasīšana: tad apvalks tur ekrānu nomodā, Wake Lock).
+ *   4. Pasaka lietotnei, kad apvalks tiek paslēpts vai atkal kļūst redzams (op "paslepts" / "redzams"): iframe iekšā pārlūks to ne vienmēr
+ *      paziņo, bet pēc minimizēšanas lietotnei jāsūta vēlreiz pieprasījumi, kas varēja pazust. Iframe ir atļauts "screen-wake-lock",
+ *      lai nolasīšanas laikā ekrāns neaptumšotos.
  *
  * DROŠĪBA: ziņas tiek pieņemtas TIKAI no Apps Script lapām (script.google.com un *-script.googleusercontent.com),
  * atbildes tiek sūtītas TIKAI uz to pašu adresi, kas ziņu atsūtīja, un glabāt var tikai divas fiksētas atslēgas.
@@ -157,6 +161,44 @@ const SECRET_API_KEY = 'Hdj4JWTxY0EgZMFtgirbAnsyPmlfmE8CVyL6XzEG';
     if (klients) sutitKlientam(statuss(), klients.avots, klients.origin);
   }
 
+  // ── Ekrāna Wake Lock ──
+  // Kamēr lietotne nolasa čekus (op "darbs"), ekrāns netiek aptumšots, lai pārlūks lapu neapturētu. Augšējā lapā Wake Lock ir atļauts vienmēr,
+  // bet iframe iekšā to Google iekšējais kadrs var neatļaut, tāpēc to tur apvalks. Drošības siksna: ja lietotne 10 min neatsaucas, ekrāns tiek atlaists.
+  var WL_MAKS_MS = 10 * 60 * 1000;
+  var wlSentinel = null, wlAktivs = false, wlPraasa = false, wlTaimeris = null;
+  function wlAtlaist() {
+    var s = wlSentinel; wlSentinel = null;
+    if (s) rakstitDrosi(function () { var p = s.release(); if (p && p.catch) p.catch(function () {}); });
+  }
+  function wlPieprasit() {
+    if (!wlAktivs || wlSentinel || wlPraasa || document.hidden) return;
+    if (!(navigator.wakeLock && navigator.wakeLock.request)) return;
+    wlPraasa = true;
+    try {
+      navigator.wakeLock.request('screen').then(function (s) {
+        wlPraasa = false;
+        if (!wlAktivs || document.hidden) { rakstitDrosi(function () { s.release(); }); return; }
+        wlSentinel = s;
+        s.addEventListener('release', function () { if (wlSentinel === s) wlSentinel = null; });
+      }, function () { wlPraasa = false; });
+    } catch (e) { wlPraasa = false; }
+  }
+  function wlIestatit(aktivs) {
+    wlAktivs = aktivs === true;
+    clearTimeout(wlTaimeris); wlTaimeris = null;
+    if (!wlAktivs) { wlAtlaist(); return; }
+    wlTaimeris = setTimeout(function () { wlAktivs = false; wlAtlaist(); }, WL_MAKS_MS);
+    wlPieprasit();
+  }
+
+  // Redzamība: apvalks (augšējā lapa) zina, kad lietotne tiek minimizēta vai atgriezta; iframe iekšā to ne visi pārlūki paziņo uzticami
+  function pazinotRedzamibu(paslepts) {
+    if (klients) sutitKlientam({ op: paslepts ? 'paslepts' : 'redzams' }, klients.avots, klients.origin);
+  }
+  document.addEventListener('visibilitychange', function () { pazinotRedzamibu(document.hidden === true); if (!document.hidden) wlPieprasit(); });
+  window.addEventListener('pagehide', function () { pazinotRedzamibu(true); });
+  window.addEventListener('pageshow', function (ev) { if (ev.persisted) pazinotRedzamibu(false); });
+
   window.addEventListener('beforeinstallprompt', function (ev) {
     ev.preventDefault();                     // Chrome mini-josla netiek rādīta; lietotne pati piedāvā pogu
     instalesIzsaukums = ev;
@@ -197,34 +239,134 @@ const SECRET_API_KEY = 'Hdj4JWTxY0EgZMFtgirbAnsyPmlfmE8CVyL6XzEG';
       atbilde(statuss());
     } else if (d.op === 'install') {
       instalet();
+    } else if (d.op === 'darbs') {
+      wlIestatit(d.aktivs === true);
     }
   });
 
   // ── JSON ieeja (doPost) ──
-  // Pati lietotne ar serveri runā caur google.script.run, tāpēc šī funkcija netiek izsaukta automātiski. Tā ir paredzēta citiem skriptiem:
+  // Pati lietotne ar serveri runā caur google.script.run (tās čeku rinda un automātiskā atkārtošana ir Index.html), tāpēc šī funkcija netiek
+  // izsaukta automātiski. Tā ir paredzēta citiem skriptiem:
   //   CEKU_API.post('ping').then(console.log);
   //   CEKU_API.post('getData', [sesija]).then(function (dati) { … });
   // Pieprasījums ir teksts (text/plain), lai pārlūks nesūtītu pirmspārbaudi (Apps Script uz to neatbild). Apiet atslēgu ar apiKey nevar:
   // serveris to pārbauda pirmo un nesakrišanas gadījumā atbild "Piekļuve liegta".
-  function apiPost(darbiba, args) {
-    var url = lietotnesAdrese();
-    if (!url) return Promise.reject(new Error('Nav norādīta Apps Script adrese.'));
+  //
+  // STABILITĀTE (ja vienlaikus jānolasa daudz čeku, piemēram, 9):
+  //   • RINDA: scanReceipt (dārgais AI izsaukums) nekad netiek sūtīts "visi uzreiz" — vienlaikus ceļā ir ne vairāk kā MAKS_PARALELI
+  //     pieprasījumi un starp divu nosūtīšanu ir vismaz ATSTARPE_MS. Pārējie gaida rindā; neviens pieprasījums neapstādina citus.
+  //   • AUTOMĀTISKA ATKĀRTOŠANA: pārejošas kļūdas (tīkls, taimauts, ne-JSON atbilde, servera „pārslogota” / „īslaicīgi nav pieejams”)
+  //     tiek mēģinātas vēlreiz līdz ATKARTOJUMI reizēm (1 s un 3 s; pēc pārslodzes 5 s un 10 s), pirms kļūda nonāk pie izsaucēja.
+  //   • TIKAI DROŠAS DARBĪBAS: atkārto tikai tās, kuras var atkārtot bez blakusefekta: lasīšanu, scanReceipt (neko neraksta) un saveReceipt,
+  //     JA čekam ir darba ID (serveris pēc tā atpazīst atkārtojumu un čeku tabulā neieraksta otrreiz). Ja izsaucējs ID nenorāda, apvalks to
+  //     pievieno pats (scanReceipt: 5. arguments; saveReceipt: lauks "id" čeka datos), lai atkārtojums vienmēr būtu drošs.
+  //     Citas rakstošās darbības (budžeti, kategorijas, iestatījumi u.c.) NETIEK atkārtotas.
+  //   • Pastāvīgas kļūdas ("Piekļuve liegta", slikts attēls, nederīgs formāts) netiek atkārtotas — tās neko neuzlabotu.
+  var MAKS_PARALELI = 3;
+  var ATSTARPE_MS = 600;
+  var ATKARTOJUMI = 2;
+  var ATKARTOJUMA_PAUZES = [1000, 3000];
+  var PARSLOGOTA_PAUZES = [5000, 10000];
+  var DROSAS_DARBIBAS = { ping: 1, getUser: 1, getData: 1, getInsight: 1, scanReceipt: 1 };   // drīkst atkārtot
+  var DARBA_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;                                                  // tāds pats formāts kā serverī (DARBA_ID_RE)
+  var ID_ALFABETS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+  function jaunsDarbaId() {
+    var b = new Uint8Array(22), s = '', i;
+    try { crypto.getRandomValues(b); } catch (e) { for (i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256); }
+    for (i = 0; i < b.length; i++) s += ID_ALFABETS.charAt(b[i] & 63);
+    return s;
+  }
+  // Atgriež argumentus, kuros ir darba ID (ja izsaucējs to nenorādīja, tiek pievienots jauns), vai tos pašus, ja darbībai ID nav vajadzīgs.
+  // Izsaucēja masīvs netiek mainīts.
+  function arDarbaId(darbiba, args) {
+    var a = Array.isArray(args) ? args.slice() : [];
+    if (darbiba === 'scanReceipt') {
+      if (typeof a[4] !== 'string' || !DARBA_ID_RE.test(a[4])) { while (a.length < 4) a.push(null); a[4] = jaunsDarbaId(); }
+    } else if (darbiba === 'saveReceipt') {
+      var c = a[0];
+      if (c && typeof c === 'object' && !Array.isArray(c) && (typeof c.id !== 'string' || !DARBA_ID_RE.test(c.id))) { a[0] = Object.assign({}, c, { id: jaunsDarbaId() }); }
+    }
+    return a;
+  }
+  // Vai darbību drīkst atkārtot: lasīšana un scanReceipt vienmēr; saveReceipt tikai ar derīgu darba ID
+  function drosiAtkartot(darbiba, args) {
+    if (irDarbiba(DROSAS_DARBIBAS, darbiba)) return true;
+    return darbiba === 'saveReceipt' && Array.isArray(args) && !!args[0] && typeof args[0] === 'object' && typeof args[0].id === 'string' && DARBA_ID_RE.test(args[0].id);
+  }
+  var RINDAS_DARBIBAS = { scanReceipt: 1 };                                                    // iet caur rindu
+  var PARSLOGOTS_RE = /pārslogota|īslaicīgi nav pieejams/i;
+  function irDarbiba(saraksts, v) { return Object.prototype.hasOwnProperty.call(saraksts, v); }
+  function pauze(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+
+  // Viens pieprasījums bez atkārtošanas. Kļūdai tiek piekārtots: pagaidu (vērts atkārtot) un parslogots (gaidīt ilgāk).
+  function vienaisPieprasijums(url, darbiba, args) {
+    function kluda(zina, pagaidu, parslogots) { var e = new Error(zina); e.pagaidu = pagaidu === true; e.parslogots = parslogots === true; return e; }
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ apiKey: SECRET_API_KEY, action: String(darbiba), args: Array.isArray(args) ? args : [] }),
+      body: JSON.stringify({ apiKey: SECRET_API_KEY, action: darbiba, args: Array.isArray(args) ? args : [] }),
       credentials: 'omit',
       redirect: 'follow'
+    }).catch(function () {
+      throw kluda('Nav savienojuma ar serveri.', true);                                           // tīkla kļūda / taimauts
     }).then(function (r) {
-      return r.json().catch(function () { throw new Error('Servera atbilde nav derīga.'); });
+      return r.json().catch(function () { throw kluda('Servera atbilde nav derīga.', true); });   // Google kļūdas lapa utml.
     }).then(function (d) {
-      if (!d || d.ok !== true) throw new Error((d && typeof d.kluda === 'string' && d.kluda) || 'Piekļuve liegta');
+      if (!d || d.ok !== true) {
+        var zina = (d && typeof d.kluda === 'string' && d.kluda) || 'Piekļuve liegta';
+        var p = PARSLOGOTS_RE.test(zina);
+        throw kluda(zina, p, p);
+      }
       return d.res;
     });
+  }
+  // Vienu reizi + līdz ATKARTOJUMI atkārtojumiem (tikai drošām darbībām un tikai pārejošām kļūdām)
+  function arAtkartojumiem(url, darbiba, args) {
+    var atkartot = drosiAtkartot(darbiba, args);
+    function meginat(n) {
+      return vienaisPieprasijums(url, darbiba, args).catch(function (e) {
+        if (!atkartot || n >= ATKARTOJUMI || !e || e.pagaidu !== true) throw e;
+        return pauze((e.parslogots ? PARSLOGOTA_PAUZES : ATKARTOJUMA_PAUZES)[n]).then(function () { return meginat(n + 1); });
+      });
+    }
+    return meginat(0);
+  }
+
+  // Rinda dārgajiem izsaukumiem: ne vairāk kā MAKS_PARALELI vienlaikus un vismaz ATSTARPE_MS starp nosūtīšanām.
+  // Atkārtojuma pauze paliek tajā pašā vietā rindā, tāpēc pārslodzes laikā arī jauni pieprasījumi netiek sūtīti ātrāk.
+  var rinda = [], lidojuma = 0, pedejaPalaisana = 0, rindasTaimeris = null;
+  function rindaPalaist() {
+    if (rindasTaimeris) { clearTimeout(rindasTaimeris); rindasTaimeris = null; }
+    while (rinda.length && lidojuma < MAKS_PARALELI) {
+      var gaidit = pedejaPalaisana + ATSTARPE_MS - Date.now();
+      if (gaidit > 0) { rindasTaimeris = setTimeout(rindaPalaist, gaidit + 5); return; }
+      lidojuma++; pedejaPalaisana = Date.now();
+      rinda.shift()();
+    }
+  }
+  function rindaPievienot(darbs) {
+    return new Promise(function (ok, kluda) {
+      rinda.push(function () {
+        var p; try { p = Promise.resolve(darbs()); } catch (e) { p = Promise.reject(e); }
+        p.then(ok, kluda).then(function () { lidojuma--; rindaPalaist(); });
+      });
+      rindaPalaist();
+    });
+  }
+
+  function apiPost(darbiba, args) {
+    var url = lietotnesAdrese();
+    if (!url) return Promise.reject(new Error('Nav norādīta Apps Script adrese.'));
+    var vards = String(darbiba);
+    var argumenti = arDarbaId(vards, args);        // viens un tas pats ID visiem šī izsaukuma atkārtojumiem
+    var darbs = function () { return arAtkartojumiem(url, vards, argumenti); };
+    return irDarbiba(RINDAS_DARBIBAS, vards) ? rindaPievienot(darbs) : darbs();
   }
   window.CEKU_API = Object.freeze({ post: apiPost });
 
   // ── Starts ──
+  // Lūdz pārlūku neizmest šīs lapas glabātuvi (sesija u.c.), kad ierīcē trūkst vietas. Tā ir tikai prasība: atbilde var būt noraidoša.
+  rakstitDrosi(function () { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); });
   var crop = Number(CFG.cropTop);
   if (isFinite(crop) && crop > 0) document.documentElement.style.setProperty('--crop', Math.min(Math.round(crop), 120) + 'px');
 
