@@ -15,12 +15,13 @@ nevar uztaisīt pilnvērtīgu PWA. Apvalks to dara viņas vietā, un papildus sa
 | `shell.js`, `shell.css` | iframe ielāde, tilts ar lietotni, instalēšanas poga, "nav interneta" ekrāns |
 | `manifest.webmanifest` | īstais PWA manifests (`background_color` un `theme_color` = `#0f172a`, ikonas 192/512 ar `purpose: "any maskable"`) |
 | `sw.js` | service worker (apvalks atveras arī bez interneta; pati lietotne bez interneta nestrādā) |
-| `icons/` | ikonas (180 iOS, 192, 512; pilns kvadrāts, mala `#0f172a`, saturs 80 % drošajā zonā) un `icons/splash/` (iPhone ielādes ekrāni) |
+| `icon-180.png`, `icon-192.png`, `icon-512.png` | **obligātās** ikonas (180 iOS, 192 un 512 Android; pilns kvadrāts, mala `#0f172a`, saturs 80 % drošajā zonā) |
+| `splash-….png` (13 faili) | **neobligāti**: iPhone ielādes ekrāni; vajadzīgs tikai tas, kas atbilst tavam modelim (skat. tabulu zemāk) |
 
 ## Uzstādīšana (apmēram 5 minūtes)
 
 1. **Apps Script:** Deploy → Manage deployments → ✏️ → Version: **New version** → Execute as **Me**, Who has access **Anyone** → Deploy. Nokopē Web app adresi (beidzas ar `/exec`).
-2. **GitHub:** izveido jaunu publisku repozitoriju (piem., `ceku-skeneris`) un augšupielādē **visus šīs mapes failus** (arī mapi `icons`) repozitorija saknē.
+2. **GitHub:** izveido jaunu publisku repozitoriju (piem., `ceku-skeneris`). **Mapes nav jāaugšupielādē: visi faili atrodas vienā līmenī, nav neviena apakšmapes.** Repozitorijā: *Add file → Upload files*, atver šīs mapes saturu savā datorā, atzīmē failus (Ctrl+A / Cmd+A; pašu mapi neatzīmē) un velc visus uzreiz uz GitHub lapu. Obligāti vajadzīgi: `index.html`, `shell.js`, `shell.css`, `sw.js`, `config.js`, `manifest.webmanifest`, `icon-180.png`, `icon-192.png`, `icon-512.png`. Ielādes ekrānu (`splash-….png`) var pievienot vēlāk. Ja kāds fails trūkst, lietotne tāpat darbojas (service worker kešo tikai to, kas ir atrasts). Atjauninot failu (piem., `shell.js`), vienkārši augšupielādē to vēlreiz ar tādu pašu nosaukumu un nospied *Commit changes*: GitHub aizstās veco versiju.
 3. Repozitorijā: Settings → Pages → Source: *Deploy from a branch* → Branch: `main` / `/ (root)` → Save. Pēc minūtes lapa būs pieejama adresē `https://TAVS-LIETOTAJVARDS.github.io/ceku-skeneris/`.
 4. Atver `config.js` un ieraksti `appsScriptUrl: 'https://script.google.com/macros/s/…/exec'`. (Ja to atstāj tukšu, apvalks pirmajā palaišanā pats palūgs adresi un atcerēsies to tajā ierīcē.)
 5. **Apps Script → Project Settings → Script properties:** pievieno `PWA_ORIGIN` = `https://TAVS-LIETOTAJVARDS.github.io` (tikai domēns, **bez** `/ceku-skeneris` un bez gala slīpsvītras). Bez šī tilts ar apvalku ir izslēgts, un lietotne glabā sesiju tikai savā iframe glabātuvē.
@@ -31,7 +32,25 @@ nevar uztaisīt pilnvērtīgu PWA. Apvalks to dara viņas vietā, un papildus sa
 Visur ir **viena** krāsa, `#0f172a`: `manifest.webmanifest` (`background_color`, `theme_color`), `<meta name="theme-color">`, apvalka fons (`shell.css`) un pati lietotne (`--fons` failā Index.html). Ikonas ir **pilns kvadrāts** (bez caurspīdīgiem stūriem) ar tādu pašu malas krāsu, tāpēc Android ielādes ekrānā un ikonas maskā nekādu malu nav. Ja kādreiz maini krāsu, maini to **visās** minētajās vietās, citādi parādīsies šuve.
 
 - **Android:** ielādes ekrānu veido `background_color` + ikona. Pēc ikonas vai krāsu maiņas lietotne jāizdzēš un jāpievieno no jauna (Chrome manifestu atjauno lēni).
-- **iPhone:** iOS manifesta krāsas ignorē; ielādes ekrānu nosaka `apple-touch-startup-image` tagi `index.html` (ierīču izmēri, attēli mapē `icons/splash/`). Pēc izmaiņām lietotne jāizdzēš no sākuma ekrāna un jāpievieno no jauna, citādi iOS rāda veco (balto) ielādes ekrānu. Ja kāda jauna iPhone modeļa izmērs sarakstā nav, tam ielādes ekrāns paliek iOS noklusējuma.
+- **iPhone:** iOS manifesta krāsas ignorē; ielādes ekrānu nosaka `apple-touch-startup-image` tagi `index.html` (ierīču izmēri, attēli `splash-….png` repozitorija saknē). Pēc izmaiņām lietotne jāizdzēš no sākuma ekrāna un jāpievieno no jauna, citādi iOS rāda veco (balto) ielādes ekrānu. Ja kāda jauna iPhone modeļa izmērs sarakstā nav vai atbilstošais fails nav augšupielādēts, ielādes ekrāns paliek iOS noklusējuma (īss balts/melns ekrāns) un viss pārējais darbojas tāpat.
+
+**Kurš `splash` fails der kuram iPhone** (augšupielādē tikai savu, vai visus):
+
+| Fails | iPhone |
+|---|---|
+| `splash-1320x2868.png` | iPhone 16 Pro Max / 17 Pro Max |
+| `splash-1260x2736.png` | iPhone Air |
+| `splash-1206x2622.png` | iPhone 16 Pro / 17 / 17 Pro |
+| `splash-1290x2796.png` | iPhone 14 Pro Max / 15 Plus / 15 Pro Max / 16 Plus |
+| `splash-1179x2556.png` | iPhone 14 Pro / 15 / 15 Pro / 16 |
+| `splash-1284x2778.png` | iPhone 12 Pro Max / 13 Pro Max / 14 Plus |
+| `splash-1170x2532.png` | iPhone 12 / 12 Pro / 13 / 13 Pro / 14 |
+| `splash-1125x2436.png` | iPhone X / XS / 11 Pro / 12 mini / 13 mini |
+| `splash-1242x2688.png` | iPhone XS Max / 11 Pro Max |
+| `splash-828x1792.png` | iPhone XR / 11 |
+| `splash-1242x2208.png` | iPhone 6 Plus / 7 Plus / 8 Plus |
+| `splash-750x1334.png` | iPhone SE 2 / SE 3 / 6 / 7 / 8 |
+| `splash-640x1136.png` | iPhone SE 1 |
 
 ## Pievienošana sākuma ekrānam
 
@@ -41,7 +60,7 @@ Visur ir **viena** krāsa, `#0f172a`: `manifest.webmanifest` (`background_color`
 ## Problēmu risināšana
 
 - **Baltā/tukšā lapa vai Google kļūdas josla augšā:** Google dažkārt rāda brīdinājuma joslu "This application was created by another user…". Ieraksti `config.js` → `cropTop: 40` (pārbaudi, lai augšējā lietotnes josla nepazūd; vajadzības gadījumā samazini).
-- **Pēc kodu/failu maiņas vecā versija:** `sw.js` palielini `VERSION` (piem., `'v5'`; šobrīd `'v4'`) un augšupielādē vēlreiz.
+- **Pēc kodu/failu maiņas vecā versija:** `sw.js` palielini `VERSION` (piem., `'v7'`; šobrīd `'v6'`) un augšupielādē vēlreiz.
 - **Sesija "neturas" iOS:** pārbaudi, vai `PWA_ORIGIN` ir pareizs (precīzs domēns, `https`), un ka lietotne tiek atvērta caur apvalka adresi.
 - **Bridge nestrādā, ja Google maina savu iekšējo domēnu:** apvalks pieņem ziņas tikai no `script.google.com` un `*-script.googleusercontent.com`. Ja Google to izmaina, lietotne turpina strādāt, tikai sesija glabājas bez apvalka palīdzības.
 

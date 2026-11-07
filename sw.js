@@ -4,13 +4,20 @@
  * Stratēģija: tīkls vispirms, kešs kā rezerve (tāpēc izmaiņas failos parādās uzreiz, kad ir internets).
  * Kad maini apvalka failus, palielini VERSION, lai vecais kešs tiktu izmests.
  */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const KESS = 'ceku-apvalks-' + VERSION;
+// Visi faili atrodas vienā līmenī (nav apakšmapju), jo GitHub tīmekļa saskarne neļauj augšupielādēt mapes.
+// Katrs fails tiek kešots atsevišķi un kļūda ar vienu failu (piem., vēl neaugšupielādēta ikona) netraucē pārējiem:
+// addAll() atteiktos no VISA, ja kaut viens fails nebūtu atrasts, un service worker vispār neuzstādītos.
 const FAILI = ['./', 'index.html', 'shell.css', 'shell.js', 'config.js', 'manifest.webmanifest',
-  'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (ev) {
-  ev.waitUntil(caches.open(KESS).then(function (k) { return k.addAll(FAILI); }).then(function () { return self.skipWaiting(); }));
+  ev.waitUntil(
+    caches.open(KESS)
+      .then(function (k) { return Promise.all(FAILI.map(function (f) { return k.add(f).catch(function () { /* faila nav (vēl): izlaižam */ }); })); })
+      .then(function () { return self.skipWaiting(); })
+  );
 });
 
 self.addEventListener('activate', function (ev) {
